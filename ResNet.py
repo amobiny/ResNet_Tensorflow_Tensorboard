@@ -31,9 +31,9 @@ class ResNet:
         self.imgSize = imgSize
         self.imgChannel = imgChannel
         self.numClasses = numClasses
-        self.h = 100
-        self.lmbda = 5e-04      # for weight decay
-        self.init_lr = 0.001
+        self.h = 100            # number of hidden units of the fully-connected layer
+        self.lmbda = 5e-04      # weight decay
+        self.init_lr = 0.001    # initial learning rate
         self.x, self.y, self.keep_prob = self.create_placeholders()
 
     def create_placeholders(self):

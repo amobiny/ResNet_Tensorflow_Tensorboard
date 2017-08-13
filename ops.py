@@ -15,36 +15,36 @@ from tflearn.layers.normalization import batch_normalization
 def weight_variable(name, shape):
     """Create a weight variable with appropriate initialization."""
     initer = tf.truncated_normal_initializer(stddev=0.01)
-    return tf.get_variable('W_'+name, dtype=tf.float32,
+    return tf.get_variable('W_' + name, dtype=tf.float32,
                            shape=shape, initializer=initer)
 
 
 def bias_variable(name, shape):
     """Create a bias variable with appropriate initialization."""
     initial = tf.constant(0., shape=shape, dtype=tf.float32)
-    return tf.get_variable('b_'+name, dtype=tf.float32,
+    return tf.get_variable('b_' + name, dtype=tf.float32,
                            initializer=initial)
 
 
-def new_conv_layer(inputs,  # The previous layer.
-                   layer_name,
-                   stride,
-                   num_inChannel,  # Num. channels in prev. layer.
-                   filter_size,  # Width and height of each filter.
-                   num_filters,  # Number of filters.
-                   batch_norm,
-                   use_relu):
-    """Create a convolution layer."""
+def conv_layer(bottom,  # The previous layer.
+               layer_name,
+               stride,
+               filter_size,  # Width and height of each filter.
+               num_filters,  # Number of filters.
+               batch_norm,
+               use_relu):
+    """Creates a convolution layer."""
+    num_inChannel = bottom.get_shape().as_list()[-1]
     # Shape of the filter-weights for the convolution.
     shape = [filter_size, filter_size, num_inChannel, num_filters]
     with tf.variable_scope(layer_name):
         weights = weight_variable(layer_name, shape=shape)
         # tf.summary.histogram('histogram', weights)
         biases = bias_variable(layer_name, [num_filters])
-        layer = tf.nn.conv2d(input=inputs,
+        layer = tf.nn.conv2d(input=bottom,
                              filter=weights,
                              strides=[1, stride, stride, 1],
-                          padding="SAME")
+                             padding="SAME")
         if batch_norm:
             layer = batch_normalization(layer)
         # Add the biases to the results of the convolution.
@@ -69,8 +69,8 @@ def fc_layer(bottom,  # The previous layer.
              batch_norm=False,
              add_reg=True,
              use_relu=True):  # Use Rectified Linear Unit (ReLU)?
-    """Create a fully connected layer"""
-    in_dim = bottom.get_shape()[1]
+    """Creates a fully connected layer"""
+    in_dim = bottom.get_shape().as_list()[1]
     with tf.variable_scope(name):
         weights = weight_variable(name, shape=[in_dim, out_dim])
         # tf.summary.histogram('histogram', weights)
@@ -110,52 +110,47 @@ def dropout(x, keep_prob):
     return tf.nn.dropout(x, keep_prob)
 
 
-def bottleneck_block(x, num_ch, block_name,
+def bottleneck_block(x, block_name,
                      s1, k1, nf1, name1,
                      s2, k2, nf2, name2,
                      s3, k3, nf3, name3,
                      s4, k4, name4, first_block=False):
-    # num_ch = x.get_shape()[-1]
     with tf.variable_scope(block_name):
         # Convolutional Layer 1
-        layer_conv1 = new_conv_layer(inputs=x,
-                                     layer_name=name1,
-                                     stride=s1,
-                                     num_inChannel=num_ch,
-                                     filter_size=k1,
-                                     num_filters=nf1,
-                                     batch_norm=True,
-                                     use_relu=True)
+        layer_conv1 = conv_layer(x,
+                                 layer_name=name1,
+                                 stride=s1,
+                                 filter_size=k1,
+                                 num_filters=nf1,
+                                 batch_norm=True,
+                                 use_relu=True)
 
         # Convolutional Layer 2
-        layer_conv2 = new_conv_layer(inputs=layer_conv1,
-                                     layer_name=name2,
-                                     stride=s2,
-                                     num_inChannel=nf1,
-                                     filter_size=k2,
-                                     num_filters=nf2,
-                                     batch_norm=True,
-                                     use_relu=True)
+        layer_conv2 = conv_layer(layer_conv1,
+                                 layer_name=name2,
+                                 stride=s2,
+                                 filter_size=k2,
+                                 num_filters=nf2,
+                                 batch_norm=True,
+                                 use_relu=True)
 
         # Convolutional Layer 3
-        layer_conv3 = new_conv_layer(inputs=layer_conv2,
-                                     layer_name=name3,
-                                     stride=s3,
-                                     num_inChannel=nf2,
-                                     filter_size=k3,
-                                     num_filters=nf3,
-                                     batch_norm=True,
-                                     use_relu=False)
+        layer_conv3 = conv_layer(layer_conv2,
+                                 layer_name=name3,
+                                 stride=s3,
+                                 filter_size=k3,
+                                 num_filters=nf3,
+                                 batch_norm=True,
+                                 use_relu=False)
 
         if first_block:
-            shortcut = new_conv_layer(inputs=x,
-                                      layer_name=name4,
-                                      stride=s4,
-                                      num_inChannel=num_ch,
-                                      filter_size=k4,
-                                      num_filters=nf3,
-                                      batch_norm=True,
-                                      use_relu=False)
+            shortcut = conv_layer(x,
+                                  layer_name=name4,
+                                  stride=s4,
+                                  filter_size=k4,
+                                  num_filters=nf3,
+                                  batch_norm=True,
+                                  use_relu=False)
             assert (
                 shortcut.get_shape().as_list() == layer_conv3.get_shape().as_list()), "Tensor sizes of the two branches are not matched!"
             res = shortcut + layer_conv3
