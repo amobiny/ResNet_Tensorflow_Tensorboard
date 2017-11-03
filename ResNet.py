@@ -18,40 +18,41 @@ from ops import *
 from utils import *
 from network import create_network
 
-class ResNet:
 
+class ResNet:
     # Class properties
-    __network = None         # Graph for ResNet
-    __train_op = None        # Operation used to optimize loss function
-    __loss = None            # Loss function to be optimized, which is based on predictions
-    __accuracy = None        # Classification accuracy for all conditions
-    __probs = None           # Prediction probability matrix of shape [batch_size, numClasses]
+    __network = None  # Graph for ResNet
+    __train_op = None  # Operation used to optimize loss function
+    __loss = None  # Loss function to be optimized, which is based on predictions
+    __accuracy = None  # Classification accuracy for all conditions
+    __probs = None  # Prediction probability matrix of shape [batch_size, numClasses]
 
     def __init__(self, numClasses, imgSize, imgChannel):
         self.imgSize = imgSize
         self.imgChannel = imgChannel
         self.numClasses = numClasses
-        self.h = 100            # number of hidden units of the fully-connected layer
-        self.lmbda = 5e-04      # weight decay
-        self.init_lr = 0.001    # initial learning rate
+        self.h = 100  # number of hidden units of the fully-connected layer
+        self.lmbda = 5e-04  # weight decay
+        self.init_lr = 0.001  # initial learning rate
         self.x, self.y, self.keep_prob = self.create_placeholders()
+        self.is_train = tf.Variable(True, trainable=False, dtype=tf.bool)
 
     def create_placeholders(self):
         with tf.name_scope('Input'):
-            self.x = tf.placeholder(tf.float32, shape=(None,
-                                                       self.imgSize,
-                                                       self.imgSize,
-                                                       self.imgChannel), name='x-input')
-            self.y = tf.placeholder(tf.float32, shape=(None, self.numClasses), name='y-input')
-            self.keep_prob = tf.placeholder(tf.float32)
-        return self.x, self.y, self.keep_prob
+            x = tf.placeholder(tf.float32, shape=(None,
+                                                  self.imgSize,
+                                                  self.imgSize,
+                                                  self.imgChannel), name='x-input')
+            y = tf.placeholder(tf.float32, shape=(None, self.numClasses), name='y-input')
+            keep_prob = tf.placeholder(tf.float32)
+        return x, y, keep_prob
 
     def inference(self):
         if self.__network:
             return self
         # Building network...
         with tf.variable_scope('ResNet'):
-            net = create_network(self.x, self.h, self.keep_prob, self.numClasses)
+            net = create_network(self.x, self.h, self.keep_prob, self.numClasses, self.is_train)
         self.__network = net
         return self
 
@@ -76,7 +77,8 @@ class ResNet:
                 cross_entropy = cross_entropy_loss(self.y, self.__network)
                 tf.summary.scalar('cross_entropy', cross_entropy)
             with tf.name_scope('l2_loss'):
-                l2_loss = tf.reduce_sum(self.lmbda * tf.stack([tf.nn.l2_loss(v) for v in tf.get_collection('reg_weights')]))
+                l2_loss = tf.reduce_sum(
+                    self.lmbda * tf.stack([tf.nn.l2_loss(v) for v in tf.get_collection('reg_weights')]))
                 tf.summary.scalar('l2_loss', l2_loss)
             with tf.name_scope('total'):
                 self.__loss = cross_entropy + l2_loss
